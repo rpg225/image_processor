@@ -1,4 +1,7 @@
 use image::{DynamicImage, ImageBuffer, Rgba};
+use rayon::prelude::*;
+use std::fs;
+use std::path::Path;
 
 fn load_image(filepath: &str) -> Result<DynamicImage, image::ImageError> {
     image::open(filepath)
@@ -22,15 +25,34 @@ fn rotate_image_90_clockwise(img: &ImageBuffer<Rgba<u8>, Vec<u8>>,) -> ImageBuff
 
 
 fn main() {
-    println! ("Image Processing - Enumerating Pixels");
-    let img_path = "C:\\Users\\Rambod\\image_processor\\src\\assets\\sample_img.png";
-    let img = load_image(img_path).expect("Failed to load image");
+    println! ("Image Processing - Parallel Processing through Rayon");
 
-    let rotated_img = rotate_image_90_clockwise(&img.to_rgba8()); // rotate 90 degrees clockwise
+    // get all image paths in the parallel directory
+    let image_dir = Path::new("parallel");
+    let image_paths = fs::read_dir(image_dir)
+        .expect("Failed to read directory")
+        .into_tier()
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().is_ok() && entry.file_type().unwrap().is_file())
+        .map(|entry| entry.path())
+        .collect::<Vec<_>>();
 
-    rotated_img
-        .save("C:\\Users\\Rambod\\image_processor\\src\\assets\\processedimg.png")
-        .expect("Failed to save processed image.");
+        image_paths.par_iter().for_each(|img_path| {
+            let img = load_image(img_path.to_str().unwrap()).expect("Failed to load image");
+            let rotated_img = rotate_image_90_clockwise(&img.to_rgba8()); // rotate 90 degrees clockwise
+
+            let processed_path = format!("parallel/processed_{}", img_path.file_name().unwrap().to_str().unwrap());
+            rotated_img
+                .save(processed_path)
+                .expect("Failed to save processed file.");
+
+        });
+
+    // let rotated_img = rotate_image_90_clockwise(&img.to_rgba8()); // rotate 90 degrees clockwise
+
+    // rotated_img
+    //     .save("C:\\Users\\Rambod\\image_processor\\src\\assets\\processedimg.png")
+    //     .expect("Failed to save processed image.");
 
 
     // cropped_img.save("C:\\Users\\Rambod\\image_processor\\src\\assets\\croppedimg.png").expect("Failed to save cropped image");
